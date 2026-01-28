@@ -213,19 +213,31 @@ async def busy_flow_guard(message: Message):
 # ----------------------------
 @dp.message(StateFilter(None), F.text == "💰 Прайс")
 async def price_from_keyboard(message: Message):
-    text = ""
+    user_id = message.from_user.id
+    user_is_vip = is_vip(user_id)
 
-    # --- ПОДПИСКИ ---
-    for region, periods in PRICES.items():
+    text = "💰 Прайс\n"
+    text += "👑 ОПТ (VIP)\n\n" if user_is_vip else "💳 Розница\n\n"
+
+    # --- ПОДПИСКИ (через get_price) ---
+    for region, periods in PRICES.items():  # берем структуру (регионы/периоды/названия), цены считаем отдельно
         text += f"🌍 {region}\n"
         for period, subs in periods.items():
             text += f"  📆 {period}\n"
-            for sub, price in subs.items():
-                text += f"    {sub}: {price} ₽\n"
+            for sub_name in subs.keys():
+                try:
+                    price = get_price(
+                        user_id=user_id,
+                        region=region,
+                        period=period,
+                        sub_type=sub_name,
+                    )
+                    text += f"    {sub_name}: {price} ₽\n"
+                except ValueError:
+                    continue
         text += "\n"
 
     # --- ПОПОЛНЕНИЕ (разделение VIP/Розница) ---
-    user_is_vip = is_vip(message.from_user.id)
     tables = VIP_TOPUP if user_is_vip else TOPUP
     label = "👑 ОПТ (VIP)" if user_is_vip else "💳 Розница"
 
@@ -240,6 +252,7 @@ async def price_from_keyboard(message: Message):
         text += "\n"
 
     await message.answer(text)
+
 
 
 
